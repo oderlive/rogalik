@@ -83,11 +83,17 @@ function Game() {
                 if (tile.type === 'wall') tileElement.addClass('tileW');
                 if (this.hero && this.hero.x === x && this.hero.y === y) {
                     tileElement.addClass('tileP');
+                    let healthBar = $('<div class="health"></div>');
+                    healthBar.css('width', this.hero.hp + '%');
+                    tileElement.append(healthBar);
                 }
 
                 for (let enemy of this.enemies) {
                     if (enemy.x === x && enemy.y === y) {
                         tileElement.addClass('tileE');
+                        let healthBar = $('<div class="health"></div>');
+                        healthBar.css('width', (enemy.hp / 30 * 100) + '%');
+                        tileElement.append(healthBar);
                     }
                 }
 
@@ -113,6 +119,7 @@ function Game() {
 
         let tile = this.map.tiles[newY][newX];
         if (tile.type === 'wall') return;
+
         for (let enemy of this.enemies) {
             if (enemy.x === newX && enemy.y === newY) {
                 return;
@@ -137,11 +144,7 @@ function Game() {
 
         this.enemyTurn();
         this.draw();
-        let field = $('.field')[0];
-        let scrollX = this.hero.x * 50 - field.clientWidth / 2 + 25;
-        let scrollY = this.hero.y * 50 - field.clientHeight / 2 + 25;
-        field.scrollLeft = scrollX;
-        field.scrollTop = scrollY;
+        this.centerView();
     };
 
     this.heroAttack = function() {
@@ -182,28 +185,49 @@ function Game() {
                 }
                 continue;
             }
-            let dirs = [
-                {dx: 0, dy: -1},
-                {dx: 0, dy: 1},
-                {dx: -1, dy: 0},
-                {dx: 1, dy: 0}
-            ];
-            let dir = dirs[Math.floor(Math.random() * dirs.length)];
-            let newX = enemy.x + dir.dx;
-            let newY = enemy.y + dir.dy;
+            let dirs = [];
+            if (enemy.x < this.hero.x) dirs.push({dx: 1, dy: 0});
+            if (enemy.x > this.hero.x) dirs.push({dx: -1, dy: 0});
+            if (enemy.y < this.hero.y) dirs.push({dx: 0, dy: 1});
+            if (enemy.y > this.hero.y) dirs.push({dx: 0, dy: -1});
 
-            if (newX < 0 || newX >= this.map.width || newY < 0 || newY >= this.map.height) continue;
-            let tile = this.map.tiles[newY][newX];
-            if (tile.type === 'wall') continue;
+            if (dirs.length === 0) {
+                dirs = [
+                    {dx: 0, dy: -1},
+                    {dx: 0, dy: 1},
+                    {dx: -1, dy: 0},
+                    {dx: 1, dy: 0}
+                ];
+            }
+            dirs = dirs.sort(() => Math.random() - 0.5);
 
-            let occupied = this.enemies.some(e => e !== enemy && e.x === newX && e.y === newY);
-            if (occupied) continue;
+            for (let dir of dirs) {
+                let newX = enemy.x + dir.dx;
+                let newY = enemy.y + dir.dy;
 
-            if (this.hero.x === newX && this.hero.y === newY) continue;
+                if (newX < 0 || newX >= this.map.width || newY < 0 || newY >= this.map.height) continue;
 
-            enemy.x = newX;
-            enemy.y = newY;
+                let tile = this.map.tiles[newY][newX];
+                if (tile.type === 'wall') continue;
+
+                let occupied = this.enemies.some(e => e !== enemy && e.x === newX && e.y === newY);
+                if (occupied) continue;
+
+                if (this.hero.x === newX && this.hero.y === newY) continue;
+
+                enemy.x = newX;
+                enemy.y = newY;
+                break;
+            }
         }
+    };
+    this.centerView = function() {
+        let field = $('.field')[0];
+
+        let scrollX = this.hero.x * 50 - field.clientWidth / 2 + 25;
+        let scrollY = this.hero.y * 50 - field.clientHeight / 2 + 25;
+        field.scrollLeft = scrollX;
+        field.scrollTop = scrollY;
     };
 }
 
@@ -248,6 +272,22 @@ function Map(width, height) {
                 this.createVTunnel(y1, y2, x1);
                 this.createHTunnel(x1, x2, y2);
             }
+        }
+        let numHTunnels = Math.floor(Math.random() * 3) + 3;
+        let numVTunnels = Math.floor(Math.random() * 3) + 3;
+
+        for (let i = 0; i < numHTunnels; i++) {
+            let y = Math.floor(Math.random() * (this.height - 2)) + 1;
+            let x1 = Math.floor(Math.random() * (this.width / 2));
+            let x2 = Math.floor(Math.random() * (this.width / 2)) + this.width / 2;
+            this.createHTunnel(x1, x2, y);
+        }
+
+        for (let i = 0; i < numVTunnels; i++) {
+            let x = Math.floor(Math.random() * (this.width - 2)) + 1;
+            let y1 = Math.floor(Math.random() * (this.height / 2));
+            let y2 = Math.floor(Math.random() * (this.height / 2)) + this.height / 2;
+            this.createVTunnel(y1, y2, x);
         }
     };
 
@@ -304,6 +344,7 @@ function Enemy(tile) {
     this.x = tile.x;
     this.y = tile.y;
     this.hp = 30;
+    this.attack = 10;
 }
 function Item(tile, type) {
     this.x = tile.x;
